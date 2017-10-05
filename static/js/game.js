@@ -12,6 +12,8 @@ var map;
 var layer;
 var cursors;
 var player;
+var bullets;
+var shootButton;
 var HUD; // the group that holds all the sprites related to the HUD
 
 var game = new Phaser.Game(gameWidth, gameHeight, Phaser.CANVAS, 'To Be Determined', { preload: preload, create: create, update: update, render: render });
@@ -25,7 +27,7 @@ function preload() {
     game.load.image('diamond', '../static/assets/diamond.png');
     game.load.image('background', '../static/assets/environment/background.png');
     game.load.image('middleground', '../static/assets/environment/middleground.png');
-
+    game.load.spritesheet('bullet', '../static/assets/Fx/shot.png', 4, 6);
 }
 
 
@@ -42,6 +44,8 @@ function create() {
 
     createPlayer();
 
+    initBullets();
+
     createHUD();
    
     game.camera.follow(player);
@@ -50,7 +54,7 @@ function create() {
 
     var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
     help.fixedToCamera = true;
-
+    shootButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 }
 
 function update() {
@@ -83,6 +87,13 @@ function update() {
     {
         player.animations.stop();
     }
+
+    if (shootButton.isDown)
+    {
+    	fireBullet(player.x, player.y, 1);
+    }
+
+    game.physics.arcade.collide(bullets, layer, bulletLayerCollisionHandler, null, this);
 
     parallaxBackgrounds();
 }
@@ -140,7 +151,6 @@ function createPlayer(){
     player.animations.add('up', [], 10, true);
     player.animations.add('down', [], 10, true);
 
-    // player.body.setSize(10, 14, 2, 1);
     player.invulnerable = false;
 
 }
@@ -167,4 +177,32 @@ function toggleInvincible(){
     player.invulnerable = !player.invulnerable;
 }
 
+function initBullets(){
+	//  Our bullet group, check out example: https://phaser.io/examples/v2/games/invaders
+    bullets = game.add.group();
+    bullets.enableBody = true;
+    bullets.physicsBodyType = Phaser.Physics.ARCADE;
+    bullets.createMultiple(30, 'bullet');
+    // bullets.setAll('anchor.x', 0.5);
+    // bullets.setAll('anchor.y', 1);
+    bullets.setAll('outOfBoundsKill', true);
+    bullets.setAll('checkWorldBounds', true);
+}
 
+function fireBullet(x, y, direction){
+	//initialize based on x, y coords and specify direction
+	bullet = bullets.getFirstExists(false);
+
+	if (bullet)
+	{
+		bullet.reset(x, y);
+		bullet.body.velocity.x = direction * 200;
+		console.log('firing bullet');
+	}
+}
+
+function bulletLayerCollisionHandler(bullet, layer){
+	// when a bullet hits a wall, make it disappear
+	bullet.kill();
+	console.log('bullet collided with wall!');
+}
