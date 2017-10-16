@@ -3,6 +3,7 @@
 // Darktober Game Jam Theme: Ghost Story
 // Game title: ...
 
+var game;
 var gameWidth = 480;
 var gameHeight = 270;
 var tilesize = 16;
@@ -18,103 +19,146 @@ var shootButton;
 var blaster;
 var HUD; // the group that holds all the sprites related to the HUD
 
-var game = new Phaser.Game(gameWidth, gameHeight, Phaser.CANVAS, 'To Be Determined', { preload: preload, create: create, update: update, render: render });
+
+window.onload = function() {
+	// initialize game obj
+	game = new Phaser.Game(gameWidth, gameHeight, Phaser.CANVAS, 'To Be Determined');
+	// add game stated
+	game.state.add('Boot', Boot);
+	game.state.add('Preloader', Preloader);
+	// game.state.add('TitleScreen', TitleScreen);
+	game.state.add('Game', Game);
+	// game.state.add('GameOver', GameOver);
+	// start the first state
+	game.state.start('Boot');
+}
 
 
 function preload() {
 
-    game.load.tilemap('map', '../static/assets/tilemaps/tilemap.csv', null, Phaser.Tilemap.CSV);
-    game.load.image('tiles', '../static/assets/tilemaps/map_tiles.png');
-    game.load.spritesheet('player', '../static/assets/player/player_sheet.png', 80, 80);
-    game.load.image('diamond', '../static/assets/diamond.png');
-    game.load.image('background', '../static/assets/environment/background.png');
-    game.load.image('middleground', '../static/assets/environment/middleground.png');
-    game.load.spritesheet('bullet', '../static/assets/Fx/shot.png', 4, 6);
-    game.load.audio('blaster', '../static/assets/sounds/laser_shot.wav');
 }
 
+var Boot = function(game) {
+};
+Boot.prototype = {
 
-function create() {
+	preload: function() {
 
-    game.scale.pageAlignHorizontally = true;
-    game.scale.pageAlignVertically = true;
-    // game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
-    game.renderer.renderSession.roundPixels = true; // no blurring
+	    this.load.image('loadbar', '../static/assets/environment/loadbar.png');
 
-    blaster = game.add.audio('blaster'); // the player shot sound
-    
-    createBackgrounds();
+	},
 
-    createMap();
-
-    createPlayer();
-
-    initBullets();
-
-    createEnemies();
-
-    createHUD();
-   
-    game.camera.follow(player);
-
-    cursors = game.input.keyboard.createCursorKeys();
-
-    var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
-    help.fixedToCamera = true;
-    shootButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+	create: function() {
+		// game window configurations size, scaling, alignment, rendering
+		game.scale.pageAlignHorizontally = true;
+	    game.scale.pageAlignVertically = true;
+	    // game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+	    game.renderer.renderSession.roundPixels = true; // no blurring
+		this.state.start('Preloader');
+	}
 }
 
-function update() {
+var Preloader = function(game) {
+};
+Preloader.prototype = {
+	
+	preload: function() {
+		// add loading bar to screen while other assets are loaded
+		this.loadbar = this.add.sprite(gameWidth/2, gameHeight/2, 'loadbar');
+		this.loadbar.anchor.setTo(0.5, 0.5);
+		this.load.setPreloadSprite(this.loadbar);
 
-    game.physics.arcade.collide(player, layer);
-    game.physics.arcade.collide(enemies, layer);
+		// Load the rest of the game assets
+		game.load.tilemap('map', '../static/assets/tilemaps/tilemap.csv', null, Phaser.Tilemap.CSV);
+	    game.load.image('tiles', '../static/assets/tilemaps/map_tiles.png');
+	    game.load.spritesheet('player', '../static/assets/player/player_sheet.png', 80, 80);
+	    game.load.image('diamond', '../static/assets/diamond.png');
+	    game.load.image('background', '../static/assets/environment/background.png');
+	    game.load.image('middleground', '../static/assets/environment/middleground.png');
+	    game.load.spritesheet('bullet', '../static/assets/Fx/shot.png', 4, 6);
+	    game.load.audio('blaster', '../static/assets/sounds/laser_shot.wav');
 
-
-    player.body.velocity.set(0);
-
-    if (cursors.left.isDown)
-    {
-        player.body.velocity.x = -100;
-        player.play('run');
-    }
-    else if (cursors.right.isDown)
-    {
-        player.body.velocity.x = 100;
-        player.play('run');
-    }
-    else if (cursors.up.isDown)
-    {
-        player.body.velocity.y = -100;
-        player.play('jump');
-    }
-    else if (cursors.down.isDown)
-    {
-        player.body.velocity.y = 100;
-        player.play('idle');
-    }
-    else
-    {
-        player.play('idle');
-    }
-
-    if (shootButton.isDown)
-    {
-    	fireBullet(player.x, player.y, 1);
-    	blaster.play();
-    }
-
-    game.physics.arcade.collide(bullets, layer, bulletLayerCollisionHandler, null, this);
-    game.physics.arcade.collide(bullets, enemies, bulletHitEnemyHandler, null, this);
-    game.physics.arcade.collide(player, enemies, enemyHitPlayerHandler, null, this);
-
-    parallaxBackgrounds();
+	create: function() {
+		this.state.start('Game');
+	}
 }
 
-function render() {
+var Game = function(game) {
+};
+Game.prototype = {
 
-    // game.debug.body(player);
+	create: function() {
 
+	    blaster = game.add.audio('blaster'); // the player shot sound
+	    
+	    createBackgrounds();
+
+	    createMap();
+
+	    createPlayer();
+
+	    initBullets();
+
+	    createEnemies();
+
+	    createHUD();
+	   
+	    game.camera.follow(player);
+
+	    cursors = game.input.keyboard.createCursorKeys();
+
+	    var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
+	    help.fixedToCamera = true;
+	    shootButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+
+	},
+
+	update: function() {
+
+		game.physics.arcade.collide(player, layer);
+	    game.physics.arcade.collide(enemies, layer);
+
+
+	    player.body.velocity.set(0);
+
+	    //handle left-right movements
+	    if (cursors.left.isDown)
+	    {
+	    	player.scale.x = -1; // flip the player sprite to face left
+	        player.body.velocity.x = -100;
+	        player.play('run');
+	    }
+	    else if (cursors.right.isDown)
+	    {
+	    	player.scale.x = 1; //flip player sprite to face right (default)
+	        player.body.velocity.x = 100;
+	        player.play('run');
+	    } else {
+	    	player.body.velocity.x = 0;
+	    }
+
+	    //handle jumping
+	    if (cursors.up.isDown && player.body.onFloor())
+	    {
+	        player.body.velocity.y = -200;
+	        player.play('jump');
+	    }
+	  
+
+	    if (shootButton.isDown)
+	    {
+	    	fireBullet(player.x, player.y, 1);
+	    	blaster.play();
+	    }
+
+	    game.physics.arcade.collide(bullets, layer, bulletLayerCollisionHandler, null, this);
+	    game.physics.arcade.collide(bullets, enemies, bulletHitEnemyHandler, null, this);
+	    game.physics.arcade.collide(player, enemies, enemyHitPlayerHandler, null, this);
+
+    	parallaxBackgrounds();
+	}
 }
+
 
 function createBackgrounds(){
     background = game.add.tileSprite(0, 0, gameWidth, gameHeight, 'background');
@@ -152,11 +196,12 @@ function parallaxBackgrounds(){
 function createPlayer(){
 
     player = game.add.sprite(0, 0, 'player', 80);
+    player.anchor.setTo(0.5);
+
     game.physics.arcade.enable(player);
-    player.body.gravity.y = 300;
+    player.body.gravity.y = 600;
     player.body.setSize(11, 40, 35, 24);
 
-    player.anchor.setTo(0.5);
 
     player.animations.add('jump', [10, 11, 12, 13, 14, 15], 50, true);
     player.animations.add('run', [20, 21, 22, 23, 24, 25, 26, 27, 28, 29] , 50, true);
@@ -164,6 +209,17 @@ function createPlayer(){
     player.animations.add('idle', [0, 1, 2, 3], 10, true);
 
     player.invulnerable = false;
+
+ //    player.update = function(){
+
+	// 	// this.angle += 2.0;
+	// 	if(player.body.x > x + 50){
+	// 		player.body.velocity.x -= 3;
+	// 	}else {
+	// 		player.body.velocity.x += 3;
+	// 	}
+
+	// }
 
 }
 
@@ -222,7 +278,7 @@ function bulletLayerCollisionHandler(bullet, layer){
 function bulletHitEnemyHandler(bullet, enemy) {
 	//when a bullet hits and enemy, destroy the bullet and decrement enemyHealth
 	bullet.kill();
-			console.log(" taking damage!");
+	console.log(" taking damage!");
 
 	//decrement enemy health, let Enemy class handle what happens
 	enemy.decrementHealth(1);
