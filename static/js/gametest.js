@@ -12,6 +12,7 @@ var middleground;
 var map;
 var layer;
 var cursors;
+var wasd;
 var player;
 var enemies;
 var bullets;
@@ -72,12 +73,12 @@ Preloader.prototype = {
 		game.load.tilemap('map', '../static/assets/tilemaps/tilemap.csv', null, Phaser.Tilemap.CSV);
 	    game.load.image('tiles', '../static/assets/tilemaps/map_tiles.png');
 	    game.load.spritesheet('player', '../static/assets/player/player_sheet.png', 80, 80);
-	    game.load.image('diamond', '../static/assets/diamond.png');
 	    game.load.image('background', '../static/assets/environment/background.png');
 	    game.load.image('middleground', '../static/assets/environment/middleground.png');
 	    game.load.spritesheet('bullet', '../static/assets/Fx/shot.png', 4, 6);
-	    game.load.audio('blaster', '../static/assets/sounds/laser_shot.wav');
-
+	    game.load.audio('blasterSound', '../static/assets/sounds/laser_shot.wav');
+	},
+	
 	create: function() {
 		this.state.start('Game');
 	}
@@ -89,7 +90,7 @@ Game.prototype = {
 
 	create: function() {
 
-	    blaster = game.add.audio('blaster'); // the player shot sound
+	    blasterSound = game.add.audio('blasterSound'); // the player shot sound
 	    
 	    createBackgrounds();
 
@@ -107,6 +108,13 @@ Game.prototype = {
 
 	    cursors = game.input.keyboard.createCursorKeys();
 
+	    wasd = {
+	    	up: game.input.keyboard.addKey(Phaser.Keyboard.W),
+	    	down: game.input.keyboard.addKey(Phaser.Keyboard.S),
+	    	left: game.input.keyboard.addKey(Phaser.Keyboard.A),
+	    	right: game.input.keyboard.addKey(Phaser.Keyboard.D)
+	    };
+
 	    var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
 	    help.fixedToCamera = true;
 	    shootButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
@@ -118,44 +126,53 @@ Game.prototype = {
 		game.physics.arcade.collide(player, layer);
 	    game.physics.arcade.collide(enemies, layer);
 
-
-	    player.body.velocity.set(0);
-
-	    //handle left-right movements
-	    if (cursors.left.isDown)
-	    {
-	    	player.scale.x = -1; // flip the player sprite to face left
-	        player.body.velocity.x = -100;
-	        player.play('run');
-	    }
-	    else if (cursors.right.isDown)
-	    {
-	    	player.scale.x = 1; //flip player sprite to face right (default)
-	        player.body.velocity.x = 100;
-	        player.play('run');
-	    } else {
-	    	player.body.velocity.x = 0;
-	    }
-
-	    //handle jumping
-	    if (cursors.up.isDown && player.body.onFloor())
-	    {
-	        player.body.velocity.y = -200;
-	        player.play('jump');
-	    }
-	  
-
-	    if (shootButton.isDown)
-	    {
-	    	fireBullet(player.x, player.y, 1);
-	    	blaster.play();
-	    }
+	    this.handlePlayerInput();
 
 	    game.physics.arcade.collide(bullets, layer, bulletLayerCollisionHandler, null, this);
 	    game.physics.arcade.collide(bullets, enemies, bulletHitEnemyHandler, null, this);
 	    game.physics.arcade.collide(player, enemies, enemyHitPlayerHandler, null, this);
 
     	parallaxBackgrounds();
+	},
+
+	handlePlayerInput: function() {
+
+	    player.body.velocity.x = 0;
+
+	    //handle left-right movements
+	    if (cursors.left.isDown || wasd.left.isDown)
+	    {
+	    	player.scale.x = -1; // flip the player sprite to face left
+	        player.body.velocity.x = -100;
+	        if( player.body.onFloor() ) {player.play('run');}
+	    }
+	    else if (cursors.right.isDown || wasd.right.isDown)
+	    {
+	    	player.scale.x = 1; //flip player sprite to face right (default)
+	        player.body.velocity.x = 100;
+	        if( player.body.onFloor() ) {player.play('run');}
+	    } 
+	    else
+	    {
+	    	player.body.velocity.x = 0;
+	        if( player.body.onFloor() ) {player.play('idle');}
+	    }
+
+	    //handle jumping
+	    if ((cursors.up.isDown || wasd.up.isDown) && player.body.onFloor())
+	    {
+	        player.body.velocity.y = -300;
+	        player.play('jump');
+	    }
+	  
+
+	    if (shootButton.isDown)
+	    {
+	    	fireBullet(player.x, player.y, player.scale.x);
+	    	blasterSound.play();
+	    }
+
+
 	}
 }
 
@@ -166,6 +183,7 @@ function createBackgrounds(){
     background.fixedToCamera = true;
     middleground.fixedToCamera = true;
 }
+
 function createMap(){
 
     //collision map
@@ -183,7 +201,6 @@ function createMap(){
     //  setting some tile callbacks
     map.setCollisionBetween(1, 5);
     map.setTileIndexCallback(2, onHit, this);
-
 
     //  Un-comment this on to see the collision tiles
     // layer.debug = true;
@@ -210,23 +227,11 @@ function createPlayer(){
 
     player.invulnerable = false;
 
- //    player.update = function(){
-
-	// 	// this.angle += 2.0;
-	// 	if(player.body.x > x + 50){
-	// 		player.body.velocity.x -= 3;
-	// 	}else {
-	// 		player.body.velocity.x += 3;
-	// 	}
-
-	// }
-
 }
 
 function createHUD(){
     HUD = game.add.group();
-    var health = HUD.create(0, 0, 'diamond');
-    health.fixedToCamera = true;
+    // health.fixedToCamera = true;
 }
 
 function onHit(sprite){
@@ -322,9 +327,9 @@ function Enemy(x, y, spriteName) {
 
 		// this.angle += 2.0;
 		if(this.body.x > x + 50){
-			this.body.velocity.x -= 3;
+			this.body.velocity.x = -50;
 		}else {
-			this.body.velocity.x += 3;
+			this.body.velocity.x = 50;
 		}
 
 	}
