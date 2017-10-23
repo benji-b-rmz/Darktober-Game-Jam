@@ -18,6 +18,7 @@ var enemies;
 var bullets;
 var shootButton;
 var blaster;
+var bulletTimer = 0;
 var HUD; // the group that holds all the sprites related to the HUD
 
 
@@ -53,8 +54,8 @@ Boot.prototype = {
 		// game window configurations size, scaling, alignment, rendering
 		game.scale.pageAlignHorizontally = true;
 	    game.scale.pageAlignVertically = true;
-	    // game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
-	    game.renderer.renderSession.roundPixels = true; // no blurring
+	    game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+	    game.renderer.renderSession.roundPixels = false // no blurring
 		this.state.start('Preloader');
 	}
 }
@@ -71,7 +72,7 @@ Preloader.prototype = {
 
 		// Load the rest of the game assets
 		game.load.tilemap('map', '../static/assets/tilemaps/tilemap.csv', null, Phaser.Tilemap.CSV);
-	    game.load.image('tiles', '../static/assets/tilemaps/map_tiles.png');
+	    game.load.image('tiles', '../static/assets/environment/tiles.png');
 	    game.load.spritesheet('player', '../static/assets/player/player_sheet.png', 80, 80);
 	    game.load.image('background', '../static/assets/environment/background.png');
 	    game.load.image('middleground', '../static/assets/environment/middleground.png');
@@ -115,8 +116,8 @@ Game.prototype = {
 	    	right: game.input.keyboard.addKey(Phaser.Keyboard.D)
 	    };
 
-	    var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
-	    help.fixedToCamera = true;
+	    // var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
+	    // help.fixedToCamera = true;
 	    shootButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 
 	},
@@ -144,17 +145,20 @@ Game.prototype = {
 	    {
 	    	player.scale.x = -1; // flip the player sprite to face left
 	        player.body.velocity.x = -100;
+	        player.isRunning = true;
 	        if( player.body.onFloor() ) {player.play('run');}
 	    }
 	    else if (cursors.right.isDown || wasd.right.isDown)
 	    {
 	    	player.scale.x = 1; //flip player sprite to face right (default)
 	        player.body.velocity.x = 100;
+	        player.isRunning = true;
 	        if( player.body.onFloor() ) {player.play('run');}
 	    } 
 	    else
 	    {
 	    	player.body.velocity.x = 0;
+	    	player.isRunning = false;
 	        if( player.body.onFloor() ) {player.play('idle');}
 	    }
 
@@ -166,10 +170,9 @@ Game.prototype = {
 	    }
 	  
 
-	    if (shootButton.isDown)
+	    if (shootButton.isDown && (game.time.now > bulletTimer))
 	    {
 	    	fireBullet(player.x, player.y, player.scale.x);
-	    	blasterSound.play();
 	    }
 
 
@@ -199,8 +202,8 @@ function createMap(){
     layer.resizeWorld();
 
     //  setting some tile callbacks
-    map.setCollisionBetween(1, 5);
-    map.setTileIndexCallback(2, onHit, this);
+    map.setCollisionBetween(6, 11);
+    // map.setTileIndexCallback(2, onHit, this);
 
     //  Un-comment this on to see the collision tiles
     // layer.debug = true;
@@ -219,14 +222,24 @@ function createPlayer(){
     player.body.gravity.y = 600;
     player.body.setSize(11, 40, 35, 24);
 
+    player.isRunning = false;
+    // player.isShooting = false;
 
-    player.animations.add('jump', [10, 11, 12, 13, 14, 15], 50, true);
-    player.animations.add('run', [20, 21, 22, 23, 24, 25, 26, 27, 28, 29] , 50, true);
+    player.animations.add('jump', createAnimationFrameArray(10, 6) , 50, true);
+    player.animations.add('run', createAnimationFrameArray(10*2, 10), 50, true);
     // player.animations.add('down', [], 10, true);
-    player.animations.add('idle', [0, 1, 2, 3], 10, true);
-
+    player.animations.add('idle', createAnimationFrameArray(0, 4), 10, true);
+    player.animations.add('run-shoot', createAnimationFrameArray(10*3, 10), 20, false);
+    player.animations.add('idle-shoot', createAnimationFrameArray(10*4, 3), 20, false);
+    
     player.invulnerable = false;
 
+}
+
+function createAnimationFrameArray(startIndex, numOfFrames) {
+    var array = [];
+    for (var i = startIndex; i < startIndex + numOfFrames; i++) {array.push(i);}
+    return array;
 }
 
 function createHUD(){
@@ -272,6 +285,10 @@ function fireBullet(x, y, direction){
 		bullet.body.velocity.x = direction * 200;
 		console.log('firing bullet');
 	}
+	if(player.isRunning){ player.play('run-shoot');}
+	else {player.play('idle-shoot');}
+	blasterSound.play();
+	bulletTimer = game.time.now + 250;
 }
 
 function bulletLayerCollisionHandler(bullet, layer){

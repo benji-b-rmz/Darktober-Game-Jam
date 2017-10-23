@@ -158,13 +158,21 @@ function createPlayer(){
 
     player.anchor.setTo(0.5);
 
-    player.animations.add('jump', [10, 11, 12, 13, 14, 15], 50, true);
-    player.animations.add('run', [20, 21, 22, 23, 24, 25, 26, 27, 28, 29] , 50, true);
+    player.animations.add('jump', createAnimationFrameArray(10, 6) , 50, true);
+    player.animations.add('run', createAnimationFrameArray(10*2, 10), 50, true);
     // player.animations.add('down', [], 10, true);
-    player.animations.add('idle', [0, 1, 2, 3], 10, true);
+    player.animations.add('idle', createAnimationFrameArray(0, 4), 10, true);
+    player.animations.add('run-shoot', createAnimationFrameArray(10*3, 10), 50, false);
+    player.animations.add('idle-shoot', createAnimationFrameArray(10*4, 3), 50, false);
 
     player.invulnerable = false;
 
+}
+
+function createAnimationFrameArray(startIndex, numOfFrames) {
+    var array = [];
+    for (var i = startIndex, i < startIndex + numOfFrames, i++) {array.append(i);}
+    return array;
 }
 
 function createHUD(){
@@ -258,7 +266,7 @@ function Enemy(x, y, spriteName) {
 		this.health -= damage;
 		if (this.health <= 0) {
 			this.kill();
-			console.log(" took a fatal blow");
+			console.log(spriteName + " took a fatal blow");
 		}
 	}
 
