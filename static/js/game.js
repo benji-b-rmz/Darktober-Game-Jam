@@ -14,28 +14,20 @@ var layer;
 var cursors;
 var wasd;
 var player;
+var playerSpeed = 125;
 var enemies;
+var eidolon;
 var bullets;
-var shootButton;
+var enemyBullets;
+var jumpButton;
 var blaster;
 var bulletTimer = 0;
 var HUD; // the group that holds all the sprites related to the HUD
 
 
-window.onload = function() {
-	// initialize game obj
-	game = new Phaser.Game(gameWidth, gameHeight, Phaser.CANVAS, 'To Be Determined');
-	// add game stated
-	game.state.add('Boot', Boot);
-	game.state.add('Preloader', Preloader);
-	game.state.add('TitleScreen', TitleScreen);
-	game.state.add('Credits', Credits);
-	game.state.add('Game', Game);
-	game.state.add('Victory', Victory);
-	game.state.add('GameOver', GameOver);
-	// start the first state
-	game.state.start('Boot');
-}
+
+game = new Phaser.Game(gameWidth, gameHeight, Phaser.CANVAS, 'EIDOLON');
+
 
 
 function preload() {
@@ -77,13 +69,21 @@ Preloader.prototype = {
 	    game.load.image('tiles', '../static/assets/environment/tiles.png');
 	    game.load.image('background', '../static/assets/environment/background.png');
 	    game.load.image('middleground', '../static/assets/environment/middleground.png');
+	    
 	    // sprites
 	    game.load.spritesheet('player', '../static/assets/player/player_sheet.png', 80, 80);
-	    game.load.spritesheet('crab', '../static/assets/enemies/crab-idle.png', 48, 32)
-	    game.load.spritesheet('bullet', '../static/assets/Fx/shot.png', 4, 6);
-
+	    game.load.spritesheet('crab', '../static/assets/enemies/crab-walk.png', 48, 32)
+	    game.load.spritesheet('bullet', '../static/assets/Fx/shot.png', 6, 4);
+	    game.load.spritesheet('enemyBullet', '../static/assets/Fx/enemy_shot.png', 6, 4);
+	    game.load.spritesheet('wizard', '../static/assets/enemies/wizard_fly_forward.png', 80, 80);
+	    game.load.spritesheet('octopus', '../static/assets/enemies/octopus.png', 28, 36);
+	    game.load.image('heart', '../static/assets/misc/heart.png');
+	    
 	    // audio files
-	    game.load.audio('blasterSound', '../static/assets/sounds/laser_shot.wav');
+	    game.load.audio('blasterSound', '../static/assets/sounds/laserShot.wav');
+		game.load.audio('jumpSound', '../static/assets/sounds/jump.wav');
+		game.load.audio('playerGrunt', '../static/assets/sounds/playerGrunt.wav');
+		game.load.audio('enemyGrunt', '../static/assets/sounds/enemyGrunt.ogg');
 	},
 	
 	create: function() {
@@ -98,15 +98,15 @@ TitleScreen.prototype = {
 		// Add options
 		createBackgrounds();
 
-		this.titleText = game.add.text(gameWidth/2, gameHeight/2 - 10, 'EIDOLON', { font: '40px Helvetica', fill: '#ffffff'});
+		this.titleText = game.add.text(gameWidth/2, gameHeight/2 - 10, 'EIDOLON', { font: '60px Helvetica', fill: '#ff3333', fontWeight: '700'});
 		this.titleText.anchor.set(0.5);
 
-		this.playGameText = game.add.text(gameWidth/2, gameHeight/2 + 50, 'Play Game', { font: '10px Helvetica', fill: '#ffffff'});
+		this.playGameText = game.add.text(gameWidth/2, gameHeight/2 + 40, 'Play Game', { font: '15px Helvetica', fill: '#ffffff', fontWeight: '700'});
 		this.playGameText.anchor.set(0.5);
 		this.playGameText.inputEnabled = true;
 		this.playGameText.events.onInputDown.add(this.playGame, this);
 
-		this.creditsText = game.add.text(gameWidth/2, gameHeight/2 + 100, 'Credits', { font: '10px Helvetica', fill: '#ffffff'});
+		this.creditsText = game.add.text(gameWidth/2, gameHeight/2 + 70, 'Credits', { font: '15px Helvetica', fill: '#ffffff', fontWeight: '700'});
 		this.creditsText.anchor.set(0.5);
 		this.creditsText.inputEnabled = true;
 		this.creditsText.events.onInputDown.add(this.showCredits, this);
@@ -135,8 +135,18 @@ Credits.prototype = {
 	create: function() {
 		createBackgrounds();
 		var creditStrings = [
-			""
+			"Tiles, Player, Enemies by anismuz, check out his work: https://ansimuz.itch.io/",
+			"Laser Sound by user djfroyd on freesound.com",
+			"Jump Sound by user sharesynth on freesound.com",
+			"Enemy Grunt by user yudena on freesound.com",
+			"Player Grunt by user whisperbandnumber1 on freesound.com",
+			"Programming & Design by Benji"
 		];
+
+		for(var i = 0; i < creditStrings.length; i++){
+			var creditText = game.add.text(gameWidth/2, 60 + i*20, creditStrings[i], { font: '12px Helvetica', fill: '#ffffff'});
+			creditText.anchor.set(0.5);
+		}
 		//Credit title text
 		this.creditsTitle = game.add.text(gameWidth/2, 20, 'CREDITS', { font: '30px Helvetica', fill: '#ffffff'});
 		this.creditsTitle.anchor.set(0.5);
@@ -167,8 +177,11 @@ Game.prototype = {
 
 	create: function() {
 
-	    blasterSound = game.add.audio('blasterSound'); // the player shot sound
-	    
+	    blasterSound = game.add.audio('blasterSound'); 
+	   	jumpSound = game.add.audio('jumpSound'); 
+	    playerGrunt = game.add.audio('playerGrunt'); 
+	    enemyGrunt = game.add.audio('enemyGrunt');
+
 	    createBackgrounds();
 
 	    createMap();
@@ -177,7 +190,11 @@ Game.prototype = {
 
 	    initBullets();
 
+	    initEnemyBullets();
+
 	    createEnemies();
+
+	    createEidolon();
 
 	    createHUD();
 	   
@@ -194,7 +211,7 @@ Game.prototype = {
 
 	    // var help = game.add.text(16, 16, 'Arrows to move', { font: '14px Arial', fill: '#ffffff' });
 	    // help.fixedToCamera = true;
-	    shootButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+	    jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 
 	},
 
@@ -204,35 +221,40 @@ Game.prototype = {
 		if (this.playerReachedSurface()) { this.gameWon();}
 		//check if player died
 		if (player.alive == false) { this.gameOver();}
+	   	
+
 
 		game.physics.arcade.collide(player, layer);
 	    game.physics.arcade.collide(enemies, layer);
 
-	    this.handlePlayerInput();
+	   	this.handlePlayerInput();
 
 	    game.physics.arcade.collide(bullets, layer, bulletLayerCollisionHandler, null, this);
-	    game.physics.arcade.collide(bullets, enemies, bulletHitEnemyHandler, null, this);
-	    game.physics.arcade.collide(player, enemies, enemyHitPlayerHandler, null, this);
+
+	    game.physics.arcade.overlap(bullets, enemies, bulletHitEnemyHandler, null, this);
+	    game.physics.arcade.overlap(player, enemies, enemyHitPlayerHandler, null, this);
+	    game.physics.arcade.overlap(player, eidolon, enemyHitPlayerHandler, null, this);
+	    game.physics.arcade.collide(player, enemyBullets, bulletHitPlayerHandler, null, this);
+
+
 
     	parallaxBackgrounds();
 	},
 
 	handlePlayerInput: function() {
 
-	    player.body.velocity.x = 0;
-
 	    //handle left-right movements
 	    if (cursors.left.isDown || wasd.left.isDown)
 	    {
 	    	player.scale.x = -1; // flip the player sprite to face left
-	        player.body.velocity.x = -180;
+	        player.body.velocity.x = -playerSpeed;
 	        player.isRunning = true;
 	        if( player.body.onFloor() ) {player.play('run');}
 	    }
 	    else if (cursors.right.isDown || wasd.right.isDown)
 	    {
 	    	player.scale.x = 1; //flip player sprite to face right (default)
-	        player.body.velocity.x = 180;
+	        player.body.velocity.x = playerSpeed;
 	        player.isRunning = true;
 	        if( player.body.onFloor() ) {player.play('run');}
 	    } 
@@ -244,14 +266,15 @@ Game.prototype = {
 	    }
 
 	    //handle jumping
-	    if ((cursors.up.isDown || wasd.up.isDown) && player.body.onFloor())
+	    if ((cursors.up.isDown || jumpButton.isDown) && player.body.onFloor())
 	    {
-	        player.body.velocity.y = -500;
+	    	jumpSound.play();
+	        player.body.velocity.y = -400;
 	        player.play('jump');
 	    }
 	  
 
-	    if (shootButton.isDown && (game.time.now > bulletTimer))
+	    if (game.input.mousePointer.isDown && (game.time.now > bulletTimer))
 	    {
 	    	fireBullet(player.x, player.y, player.scale.x);
 	    }
@@ -259,7 +282,7 @@ Game.prototype = {
 	},
 
 	playerReachedSurface: function() {
-		if (player.body.y <= 15 * tilesize) {return true;}
+		if (player.body.x >= 218 * tilesize) {return true;}
 		return false;
 	},
 
@@ -279,13 +302,16 @@ GameOver.prototype = {
 
 		createBackgrounds();
 
-		this.playAgainText = game.add.text(gameWidth/2, gameHeight/2 + 50, 'Try Again!', { font: '25px Helvetica', fill: '#ffffff'});
+		this.gameOverText = game.add.text(gameWidth/2, gameHeight/2 - 40, 'GAME OVER', { font: '40px Helvetica', fill: '#ff1111', fontWeight: '700'});
+		this.gameOverText.anchor.set(0.5);
+
+		this.playAgainText = game.add.text(gameWidth/2, gameHeight/2 + 50, 'Try Again!', { font: '25px Helvetica', fill: '#ffffff', fontWeight: '700'});
 		this.playAgainText.anchor.set(0.5);
 		this.playAgainText.inputEnabled = true;
 		this.playAgainText.events.onInputDown.add(this.playAgain, this);
 
 		// click text or press escape to return to title
-		this.returnToTitleScreenText = game.add.text(gameWidth/2, gameHeight - 20, 'RETURN TO TITLE SCREEN', { font: '20px Helvetica', fill: '#ffffff'});
+		this.returnToTitleScreenText = game.add.text(gameWidth/2, gameHeight/2 + 100, 'RETURN TO TITLE SCREEN', { font: '20px Helvetica', fill: '#ffffff', fontWeight: '700'});
 		this.returnToTitleScreenText.anchor.set(0.5);
 		this.returnToTitleScreenText.inputEnabled = true;
 		this.returnToTitleScreenText.events.onInputDown.add(this.returnToTitleScreen, this);
@@ -316,17 +342,17 @@ Victory.prototype = {
 
 		createBackgrounds();
 
-		this.victoryText = game.add.text(gameWidth/2, gameHeight/2 - 20, 'YOU ESCAPED!!!', { font: '40px Helvetica', fill: '#ffffff'});
+		this.victoryText = game.add.text(gameWidth/2, gameHeight/2 - 20, 'YOU ESCAPED :)', { font: '40px Helvetica', fill: '#33ff33', fontWeight: '700'});
 		this.victoryText.anchor.set(0.5);
 
 		// option to play again
-		this.playAgainText = game.add.text(gameWidth/2, gameHeight/2 + 50, 'PLAY AGAIN!', { font: '25px Helvetica', fill: '#ffffff'});
+		this.playAgainText = game.add.text(gameWidth/2, gameHeight/2 + 50, 'PLAY AGAIN!', { font: '25px Helvetica', fill: '#ffffff', fontWeight: '700'});
 		this.playAgainText.anchor.set(0.5);
 		this.playAgainText.inputEnabled = true;
 		this.playAgainText.events.onInputDown.add(this.playAgain, this);
 
 		// click text or press escape to return to title
-		this.returnToTitleScreenText = game.add.text(gameWidth/2, gameHeight/2 + 100, 'RETURN TO TITLE SCREEN', { font: '25px Helvetica', fill: '#ffffff'});
+		this.returnToTitleScreenText = game.add.text(gameWidth/2, gameHeight/2 + 100, 'RETURN TO TITLE SCREEN', { font: '20px Helvetica', fill: '#ffffff', fontWeight: '700'});
 		this.returnToTitleScreenText.anchor.set(0.5);
 		this.returnToTitleScreenText.inputEnabled = true;
 		this.returnToTitleScreenText.events.onInputDown.add(this.returnToTitleScreen, this);
@@ -371,6 +397,10 @@ function createMap(){
     //  Resize the world
     layer.resizeWorld();
 
+    /* Set tile callbacks for special tiles */
+    map.setTileIndexCallback(78, onHit, this);
+
+
     /* Set tile collisions for solid impassable tiles */
 
     // General cave wall edges and fill
@@ -399,8 +429,8 @@ function createMap(){
     map.setCollisionBetween(108, 109);
 
     // Water
-    map.setCollision(78);
-    map.setCollision(84);
+    // map.setCollision(78);
+    // map.setCollision(84);
 
     // Heads
     map.setCollisionBetween(80, 81);
@@ -411,7 +441,6 @@ function createMap(){
     map.setCollisionBetween(110, 113); // 110-111 medium sized foliage, 112 - med-small, 113, smallest
     map.setCollision(114); // ceiling foliage
 
-    // map.setTileIndexCallback(2, onHit, this);
 
     //  Un-comment this on to see the collision tiles
     // layer.debug = true;
@@ -425,6 +454,7 @@ function createPlayer(){
 
     player = game.add.sprite( 10*tilesize, 55*tilesize, 'player', 80);
     player.anchor.setTo(0.5);
+    player.health = 5
 
     game.physics.arcade.enable(player);
     player.body.gravity.y = 600;
@@ -442,6 +472,7 @@ function createPlayer(){
     
     player.invulnerable = false;
 
+
 }
 
 function createAnimationFrameArray(startIndex, numOfFrames) {
@@ -452,23 +483,47 @@ function createAnimationFrameArray(startIndex, numOfFrames) {
 
 function createHUD(){
     HUD = game.add.group();
-    // health.fixedToCamera = true;
+
+    for(var i = 0; i < player.health; i++){
+    	//want to create the rightmost heart first for ordering purposes, check onHit()
+    	HUD.create(20* player.health - 20 * i, 20, 'heart'); 
+    }
+    HUD.fixedToCamera = true;
 }
 
 function onHit(sprite){
 
-    // console.log(sprite);
+	if(sprite != player) {return;}
+
     if(!player.invulnerable){
-        // damaging the player here
+
+    	player.damage(1);
+    	playerGrunt.play();
+    	knockBackPlayer();
+
         console.log("player damaged");
+        
+        // delete a heart from the HUD
+        heart = HUD.getFirstAlive();
+        if (heart) {heart.kill()}
+
+       	// make the player Invulnerable + transparent for a period after taking damage
         toggleInvincible();
-        game.time.events.add(2000, toggleInvincible, this);
+        game.time.events.add(1250, toggleInvincible, this);
 
     }
 }
 
+function knockBackPlayer(){
+	player.body.velocity.x += -(player.body.velocity.x * 2);
+	player.body.velocity.y += -(2 * player.body.velocity.y);
+
+}
+
 function toggleInvincible(){
     player.invulnerable = !player.invulnerable;
+    if (player.invulnerable) {player.alpha = 0.7;}
+    else {player.alpha = 1;}
 }
 
 function initBullets(){
@@ -476,21 +531,33 @@ function initBullets(){
     bullets = game.add.group();
     bullets.enableBody = true;
     bullets.physicsBodyType = Phaser.Physics.ARCADE;
-    bullets.createMultiple(30, 'bullet');
+    bullets.createMultiple(100, 'bullet');
     // bullets.setAll('anchor.x', 0.5);
     // bullets.setAll('anchor.y', 1);
     bullets.setAll('outOfBoundsKill', true);
     bullets.setAll('checkWorldBounds', true);
 }
 
+function initEnemyBullets(){
+	//  Our bullet group, check out example: https://phaser.io/examples/v2/games/invaders
+    enemyBullets = game.add.group();
+    enemyBullets.enableBody = true;
+    enemyBullets.physicsBodyType = Phaser.Physics.ARCADE;
+    enemyBullets.createMultiple(6, 'enemyBullet');
+    // bullets.setAll('anchor.x', 0.5);
+    // bullets.setAll('anchor.y', 1);
+    enemyBullets.setAll('outOfBoundsKill', true); 
+    enemyBullets.setAll('checkWorldBounds', true);
+}
+
 function fireBullet(x, y, direction){
 	//initialize based on x, y coords and specify direction
 	bullet = bullets.getFirstExists(false);
 
-	if (bullet)
-	{
+	if (bullet){
 		bullet.reset(x, y);
-		bullet.body.velocity.x = direction * 200;
+		// bullet.body.velocity.x = direction * 300;
+		game.physics.arcade.moveToPointer(bullet, 300);
 		console.log('firing bullet');
 	}
 	if(player.isRunning){ player.play('run-shoot');}
@@ -499,36 +566,85 @@ function fireBullet(x, y, direction){
 	bulletTimer = game.time.now + 250;
 }
 
+function fireEnemyBullet(x, y){
+	enemyBullet = enemyBullets.getFirstExists(false);
+
+	if(enemyBullet){
+		enemyBullet.reset(x, y);
+		game.physics.arcade.moveToObject(enemyBullet, player, 100);
+	}
+}
+
 function bulletLayerCollisionHandler(bullet, layer){
 	// when a bullet hits a wall, make it disappear
 	bullet.kill();
-	console.log('bullet collided with wall!');
 }
 
 function bulletHitEnemyHandler(bullet, enemy) {
 	//when a bullet hits and enemy, destroy the bullet and decrement enemyHealth
 	bullet.kill();
-	console.log(" taking damage!");
-
+	enemyGrunt.play();
 	//decrement enemy health, let Enemy class handle what happens
 	enemy.decrementHealth(1);
+
+}
+
+function bulletHitPlayerHandler(player, bullet) {
+	bullet.kill();
+	console.log("player Hit by bullet");
+
+	onHit(player);
 }
 
 function enemyHitPlayerHandler(player, enemy) {
-	onHit(enemy);
-	
+	onHit(player);
 }
 
 function createEnemies(){
 
 	enemies = game.add.group();
-	// new Enemy(20, 30, 'player');
-	// new Enemy(200, 100, 'player');
-	new Crab(200, 100);
 
+	new Crab(26 * tilesize, 56 * tilesize);
+	new Crab(80 * tilesize, 40 * tilesize);
+	new Crab(91 * tilesize, 56 * tilesize);
+	new Crab(121 * tilesize, 43 * tilesize);
+	new Crab(132 * tilesize, 48 * tilesize);
+	// new Crab(34 * tilesize, 34 * tilesize);
+
+	new Octopus(25 * tilesize, 50 * tilesize);
+	new Octopus(46 * tilesize, 48 * tilesize);
+	new Octopus(112 * tilesize, 39 * tilesize);
+	// new Octopus(137 * tilesize, 40 * tilesize);
+	// new Octopus(144 * tilesize,55 * tilesize);
+	new Octopus(156 * tilesize, 52 * tilesize);
+	new Octopus(175 * tilesize, 53 * tilesize);
+	new Octopus(186 * tilesize, 38 * tilesize);
+	// new Octopus(192 * tilesize, 29 * tilesize);
+	new Octopus(200 * tilesize, 42 * tilesize);
 
 }
 
+function createEidolon(){
+
+	eidolon = game.add.sprite(1*tilesize, 55*tilesize, 'wizard');
+	game.physics.arcade.enable(eidolon);
+	eidolon.anchor.setTo(0.5);
+	eidolon.alpha = 0.75;
+
+
+	eidolon.animations.add('chase', createAnimationFrameArray(3, 3), 2, true);
+	eidolon.play('chase');
+
+	eidolon.update = function() {
+		//make it follow the player
+		game.physics.arcade.moveToObject(eidolon, player, 75);
+		if(eidolon.body.x < player.body.x){
+			eidolon.scale.x = -1;
+		} else{
+			eidolon.scale.x = 1;
+		}
+	}
+}
 
 function Enemy(x, y, spriteName) {
 
@@ -541,11 +657,9 @@ function Enemy(x, y, spriteName) {
 
 
 	this.sprite.decrementHealth = function(damage) {
-		console.log(" taking damage!");
 		this.health -= damage;
 		if (this.health <= 0) {
 			this.kill();
-			console.log(" took a fatal blow");
 		}
 	}
 
@@ -563,11 +677,53 @@ function Enemy(x, y, spriteName) {
 }
 
 function Crab(x, y) {
+	/* Crawling enemy that chases the player when nearby */
 	this.sprite = enemies.create(x, y, 'crab', 32);
 	game.physics.arcade.enable(this.sprite);
 	this.sprite.body.gravity.y = 300;
 	this.sprite.anchor.setTo(0.5, 0.5);
 	// this.sprite.body.setSize() // TODO: Figure out the right hitbox size for the 
+	this.sprite.animations.add('walk', createAnimationFrameArray(0, 4), 10, true);
+	// this.sprite.animations.add('idle', cre)
+	this.sprite.play('walk');
+
+	this.sprite.decrementHealth = function(damage) {
+
+		this.health -= damage;
+		if (this.health <= 0) {
+			this.kill();
+		}
+	}
+
+	this.sprite.update = function(){
+
+		this.body.velocity.x = 0; 
+		if(Math.abs(player.body.x - this.body.x) < 15*tilesize) 
+		{
+			//if the player is nearby follow him, determine which direction by comparing x coords
+			if(player.body.x >= this.body.x) {
+				this.body.velocity.x = 30;
+				this.scale.x = -1;
+			} 
+			else {
+				this.body.velocity.x = -30;
+				this.scale.x = 1;
+			}
+		} 
+	}
+}
+
+function Octopus(x, y) {
+	/* Stationary character that shoots projectiles when Player is nearby */
+	this.sprite = enemies.create(x, y, 'octopus');
+	game.physics.arcade.enable(this.sprite);
+	this.sprite.body.gravity.y = 300;
+	this.sprite.shootTimer = game.time.now;
+	this.sprite.anchor.setTo(0.5, 0.5);
+	// this.sprite.body.setSize() //TODO: figure out the right hitbox for octopus
+	this.sprite.animations.add('idle', createAnimationFrameArray(0, 4), 10, true);
+	this.sprite.play('idle');
+	this.sprite.body.immovable = true;
 
 	this.sprite.decrementHealth = function(damage) {
 		console.log(" taking damage!");
@@ -577,22 +733,27 @@ function Crab(x, y) {
 			console.log(" took a fatal blow");
 		}
 	}
-
+	
 	this.sprite.update = function(){
-
-		this.body.velocity.x = 0; 
-		if(Math.abs(player.body.x - this.body.x) < 200) 
-		{
-			//if the player is nearby follow him, determine which direction by comparing x coords
-			if(player.body.x >= this.body.x) 
-			{
-				this.body.velocity.x = 30;
-			} 
-			else 
-			{
-				this.body.velocity.x = -30;
+		// if the player is nearby, shoot a missile towards him periodically
+		if((Math.abs(player.body.x - this.body.x) < 15*tilesize) && (Math.abs(player.body.y - this.body.y) < 15*tilesize) && this.alive){
+			//create a missile
+			if(this.shootTimer <= game.time.now){ 
+				fireEnemyBullet(this.body.x, this.body.y);
+				this.shootTimer = game.time.now + 2000;
 			}
-		} 
+		}
+	
 	}
 }
 
+// add game stated
+game.state.add('Boot', Boot);
+game.state.add('Preloader', Preloader);
+game.state.add('TitleScreen', TitleScreen);
+game.state.add('Credits', Credits);
+game.state.add('Game', Game);
+game.state.add('Victory', Victory);
+game.state.add('GameOver', GameOver);
+// start the first state
+game.state.start('Boot');
